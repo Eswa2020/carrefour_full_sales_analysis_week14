@@ -1,0 +1,242 @@
+---
+title: "Untitled"
+author: "Esther_Wairimu_Kamau"
+date: "1/22/2021"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+
+
+
+
+#### 1.Data loading and exploration
+
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE,error= TRUE, warning = FALSE)
+```
+
+
+
+```{r}
+#we load our dataset
+
+library("readr")
+
+jr <- read.csv("http://bit.ly/CarreFourSalesDataset")
+
+head(jr,n=3)
+
+```
+
+
+```{r}
+
+tail(jr,n=3)
+
+```
+
+```{r}
+#we check the column names we have
+# we have only two columns for date and sales
+
+names(jr)
+
+```
+
+```{r}
+
+#we can also check the no of rows and columns
+
+dim(jr)
+
+```
+
+```{r}
+#we can also go ahead and check for the datatypes
+
+str(jr)
+```
+we observe that we have two columns only with one being str(date/time) and the other numerical
+
+
+```{r}
+#we can go ahead and check for the number missing values per column
+
+colSums(is.na(jr))
+
+```
+we observe that we dont have any missing values
+
+
+```{r}
+
+#we can go ahead and check for duplicated values
+duplicated_rows <- jr[duplicated(jr),]
+
+dim(duplicated_rows)
+
+```
+We observe that we dont have any duplicated values in all columns
+
+
+
+```{r}
+uniqueitems <- unique(jr)
+
+dim(uniqueitems)
+
+```
+We observe that the whole dataset is unque meaning each date is unique and sales for that day too is unique.
+
+
+
+```{r}
+#we can go ahead and check for the outliers
+#first we can go ahead and choose the numerical columns only
+
+nums <- subset(jr, select = c(Sales))
+
+colnames(nums)
+
+boxplot(nums)
+
+```
+We observe that we have some outliers in the sales columns.
+
+
+
+#### 2.Tidying the dataset
+
+```{r}
+#we can first start by changing the pesky column names 
+#we will change them to lowercase 
+# First we Change the type of the loaded dataset to a dataframe
+
+jr1 = as.data.frame(jr)
+
+# Change column names, by making them uniform
+
+colnames(jr1) = tolower(colnames(jr1))
+
+#to confirm the change
+
+names (jr1)
+
+
+```
+
+
+
+```{r}
+#install.packages(tibbletime)
+
+library(tibbletime)
+
+jr1$date <- as.Date(jr1$date , format = "%m/%d/%Y")
+head(jr1)
+unique(jr1$date)
+
+jr1 <- as_tbl_time(jr1 , index= date)
+```
+
+
+#### 3.Exploratory data Analysis
+
+```{r}
+
+#Plotting data
+
+library(ggplot2)
+
+ggplot(jr1, aes(x=date, y=sales, color=sales)) + geom_line()
+
+```
+We see some huge spikes at different intervals from Jan to April. 
+
+
+
+#### 4.Anomally detection method
+We will now perform anomaly detection using Seasonal Hybrid ESD Test. The technique maps data as a series and captures seasonality while pointing out data which does not follow the seasonality pattern. The AnomalyDetectionTs() function finds the anomalies in the data. It will basically narrow down all the peaks keeping in mind that not more than 10% of data can be anomalies (by default). We can also reduce this number by changing the max_ano
+ms parameter in the data. We can also specify which kind of anomalies are to be identified using the direction parameter. Here, we are going to specify only positive direction anomalies to be identified. That means that sudden dips in the data are not considered.
+
+
+
+
+```{r}
+#Install the devtools package then github packages
+#install.packages("devtools")
+#install.packages("Rcpp")
+#install.packages("anomaly")
+#install.packages("anomalize")
+#devtools::install_github("twitter/AnomalyDetection")
+library(AnomalyDetection)
+```
+
+
+
+
+```{r}
+#Loading the libraries
+library(devtools)
+library(Rcpp)
+library(anomaly)
+library(anomalize)
+
+```
+
+
+
+```{r}
+anomaly.detect <- jr1 %>% 
+ group_by(`date`) %>%
+ summarize('totalsales' = sum(eval(as.symbol("sales")))) %>%
+  ungroup() %>%
+time_decompose(totalsales, method = "stl", frequency = "7 days", trend = "30 days") %>%  anomalize(remainder, method = "gesd", alpha = 0.05, max_anoms = 0.2) %>% 
+plot_anomaly_decomposition()
+
+anomaly.detect
+
+
+```
+
+
+
+```{r}
+
+#Apply anomaly detection and plot the results in a more clearer way
+#wanted to asceratin the exact points the months have anomalies
+
+jr1 %>%
+  group_by(date) %>%
+  summarise('totalsales' = sum(sales)) %>%
+  time_decompose(totalsales, method = "twitter", frequency = "auto", trend = "auto") %>%
+  anomalize(remainder, method = "gesd",alpha = 0.05, max_anoms = 0.2) %>%
+  time_recompose() %>%
+  #Anomaly Visualization
+  plot_anomalies(
+  time_recomposed =T,
+  ncol = 6,
+  color_no = "#2c3e50",
+  color_yes = "#e31a1c",
+  fill_ribbon = "blue",
+  size_dots = 3,
+  size_circles = 4)
+  
+```
+
+
+we observe that the anomalies are in the middle of february am assuming this is during the valentine day periods and near easter holidays in march.And the anomalies are spikes in the sales data.
+
+
+
+#### 5.Conclusion
+
+* The sales data seems to contain some anomalies as shown by the red points on the graph above It would be important for the marketing team to check them out to ascertain they are not fraud.
+
+*The spikes in the data in days nearing end month and holidays are indication this is when most people shop and promotions should be done majorly during this times
+
+*Also the management should do auditing for these period just to confirm that theres no fraud that happened during these events.
