@@ -14,13 +14,6 @@ output:
 #### 1.Data loading and exploration
 
 
-```{r setup, include=FALSE}
-
-knitr::opts_chunk$set(echo = TRUE,error= TRUE, warning = FALSE)
-```
-
-
-
 ```{r}
 #we load our dataset
 
@@ -39,6 +32,7 @@ tail(jr,n=3)
 
 ```
 
+
 ```{r}
 #we check the column names we have
 # we have only two columns for date and sales
@@ -46,6 +40,8 @@ tail(jr,n=3)
 names(jr)
 
 ```
+
+
 
 ```{r}
 
@@ -55,12 +51,15 @@ dim(jr)
 
 ```
 
+
+
 ```{r}
 #we can also go ahead and check for the datatypes
 
 str(jr)
 ```
 we observe that we have two columns only with one being str(date/time) and the other numerical
+
 
 
 ```{r}
@@ -72,6 +71,7 @@ colSums(is.na(jr))
 we observe that we dont have any missing values
 
 
+
 ```{r}
 
 #we can go ahead and check for duplicated values
@@ -81,6 +81,7 @@ dim(duplicated_rows)
 
 ```
 We observe that we dont have any duplicated values in all columns
+
 
 
 
@@ -136,12 +137,13 @@ names (jr1)
 
 library(tibbletime)
 
-jr1$date <- as.Date(jr1$date , format = "%m/%d/%Y")
-head(jr1)
-unique(jr1$date)
+jr$Date <- as.Date(jr$Date , format = "%m/%d/%Y")
+head(jr)
+unique(jr$Date)
 
-jr1 <- as_tbl_time(jr1 , index= date)
+jr <- as_tbl_time(jr , index= Date)
 ```
+
 
 
 #### 3.Exploratory data Analysis
@@ -185,17 +187,19 @@ library(devtools)
 library(Rcpp)
 library(anomaly)
 library(anomalize)
+library(tidyverse)
 
 ```
 
 
 
 ```{r}
-anomaly.detect <- jr1 %>% 
- group_by(`date`) %>%
- summarize('totalsales' = sum(eval(as.symbol("sales")))) %>%
-  ungroup() %>%
-time_decompose(totalsales, method = "stl", frequency = "7 days", trend = "30 days") %>%  anomalize(remainder, method = "gesd", alpha = 0.05, max_anoms = 0.2) %>% 
+anomaly.detect <- jr %>% 
+ group_by(Date) %>%
+ summarise(totalsales = sum(eval(as.symbol("Sales")))) %>%
+ ungroup() %>%
+time_decompose(totalsales) %>%  
+anomalize(remainder, method = "gesd", alpha = 0.05, max_anoms = 0.2) %>% 
 plot_anomaly_decomposition()
 
 anomaly.detect
@@ -210,11 +214,11 @@ anomaly.detect
 #Apply anomaly detection and plot the results in a more clearer way
 #wanted to asceratin the exact points the months have anomalies
 
-jr1 %>%
-  group_by(date) %>%
-  summarise('totalsales' = sum(sales)) %>%
-  time_decompose(totalsales, method = "twitter", frequency = "auto", trend = "auto") %>%
-  anomalize(remainder, method = "gesd",alpha = 0.05, max_anoms = 0.2) %>%
+jr %>%
+  group_by(Date) %>%
+  summarise(totalsales = sum(Sales),.group='drop') %>%
+  time_decompose(totalsales, method = "stl", frequency = "auto", trend = "auto") %>%
+  anomalize(remainder, method = "gesd") %>%
   time_recompose() %>%
   #Anomaly Visualization
   plot_anomalies(
