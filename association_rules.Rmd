@@ -1,0 +1,295 @@
+---
+title: "Untitled"
+author: "Esther_Wairimu_Kamau"
+date: "1/21/2021"
+output: html_document
+---
+
+
+####  1.Loading the Packages and Importing the Dataset
+
+I loaded the tidyverse package and the arules package
+
+```{r}
+
+library(arules)
+library(tidyverse)
+
+```
+
+I imported the dataset using the read.transactions() function
+
+```{r}
+
+# Importing the Dataset
+
+dataset <- read.transactions("http://bit.ly/SupermarketDatasetII" ,sep =",")
+
+
+```
+
+
+
+I used the summary function to obtain the summary statisics of the dataset.
+
+```{r}
+
+summary(dataset)
+
+```
+The dataset had 119 items with 7501 itemsets with the most frequently purchased item being mineral water.
+
+
+I then previewed the first ten itemsets using the inspect function
+
+```{r}
+inspect(dataset[1:10])
+
+```
+
+
+
+```{r}
+# we previewed the labels of the items in my dataset.
+items <- as.data.frame(itemLabels(dataset))
+colnames(items) <- "Item"
+head(items, 10)    
+tail(items,10)
+```
+
+
+
+```{r}
+#checked the frequency of first 15 labels
+itemFrequency(dataset[, 1:15],type = "absolute")
+
+``` 
+
+
+
+```{r}
+#we plotted 20 most frequent items in the dataset using the ItemFrequency and topN.
+itemFrequencyGGPlot <- function(x, topN) {
+  library(tidyverse)
+  x %>%
+    itemFrequency %>%
+    sort %>%
+    tail(topN) %>%
+    as.data.frame %>%
+    tibble::rownames_to_column() %>%
+    ggplot(aes(reorder(rowname, `.`),`.`)) + 
+    geom_col(fill='blue') + labs(title='Top 20 Labels in the Dataset' , y  = "Frequency" , x = 'Items')+
+    coord_flip()
+}  
+itemFrequencyGGPlot(dataset, 20)
+
+```
+We observed that The most frequent label within the whole dataset was the Mineral water , followed by eggs.
+
+
+#### 2.Association Rules
+
+
+```{r}
+#checked the rules of the dataset using the apriori()  function.
+rules <- apriori (dataset, parameter = list(supp = 0.001, conf = 0.8))
+rules
+
+```
+
+we set support as at  0.001 and my confidence as 0.8 , I got 74 rules from the dataset 
+
+we used the inspect function to see the first 10 rules of my dataset
+
+```{r}
+inspect(rules[1:10])
+
+```
+ We Interpretate the first rule: as If someone buys frozen smoothie and spinach, they are 89% likely to buy mineral water.
+
+
+#### 3. Visualizing association rules using the arulesviz package
+
+```{r}
+#install.packages("arulesViz")
+library(arulesViz)
+
+```
+
+
+
+```{r , fig.width=10,fig.height=10}
+
+subrules <- head(rules, n = 10, by = "confidence")
+
+
+plot(subrules, method = "graph" ,   engine = "htmlwidget")
+
+
+plot(subrules, method = "graph" ,   engine = "default")
+
+
+plot(subrules, method = "paracoord")
+
+```
+we can observe all the connections mineral water has with the other commodities
+
+
+
+
+```{r}
+# If we wanted to preview the items that make up our dataset,
+# alternatively we can do the following
+# ---
+# 
+items<-as.data.frame(itemLabels(dataset))
+colnames(items) <- "Item"
+head(items, 10)  
+
+```
+
+
+
+
+```{r}
+# Generating a summary of the transaction dataset
+# ---
+# This would give us some information such as the most purchased items, 
+# distribution of the item sets (no. of items purchased in each transaction), etc.
+# ---
+# 
+summary(dataset)
+
+```
+
+
+
+```{r}
+# Exploring the frequency of some articles 
+# i.e. transacations ranging from 1 to 10 and performing 
+# some operation in percentage terms of the total transactions 
+# 
+Tr<-dataset
+itemFrequency(Tr[, 1:10],type = "absolute")
+round(itemFrequency(Tr[, 1:10],type = "relative")*100,2)
+
+```
+
+
+
+```{r}
+# Producing a chart of frequencies and fitering 
+# to consider only items with a minimum percentage 
+# of support/ considering a top x of items
+# ---
+# Displaying top 10 most common items in the transactions dataset 
+# and the items whose relative importance is at least 10%
+# 
+par(mfrow = c(1, 2))
+
+# plot the frequency of items
+itemFrequencyPlot(Tr, topN = 10,col="darkgreen")
+itemFrequencyPlot(Tr, support = 0.1,col="darkred")
+
+```
+
+
+#### 3.Trying another confidence Interval 
+
+
+```{r}
+# Building a model based on association rules 
+# using the apriori function 
+# ---
+# We use Min Support as 0.001 and confidence as 0.8
+# ---
+# 
+rules1 <- apriori (Tr, parameter = list(supp = 0.001, conf = 0.9))
+rules1
+
+```
+we set support as at  0.001 and my confidence as 0.9 , I got 11 rules from the dataset 
+
+we used the inspect function to see the first 5 rules of my dataset
+
+
+```{r}
+
+# We use measures of significance and interest on the rules, 
+# determining which ones are interesting and which to discard.
+# ---
+# However since we built the model using 0.001 Min support 
+# and confidence as 0.8 we obtained 410 rules.
+# However, in order to illustrate the sensitivity of the model to these two parameters, 
+# we will see what happens if we increase the support or lower the confidence level
+# Building a apriori model with Min Support as 0.002 and confidence as 0.8.
+
+rules2 <- apriori (Tr,parameter = list(supp = 0.002, conf = 0.8)) 
+
+rules2
+
+```
+we observe 2rules
+
+```{r}
+# Building apriori model with Min Support as 0.001 and confidence as 0.6.
+
+rules3 <- apriori (Tr, parameter = list(supp = 0.001, conf = 0.6)) 
+
+rules3
+```
+In our first example, we increased the minimum support of 0.001 to 0.002 and model rules went from 410 to only 11. This would lead us to understand that using a high level of support can make the model lose interesting rules. In the second example, we decreased the minimum confidence level to 0.6 and the number of model rules went from 74 to 548. This would mean that using a low confidence level increases the number of rules to quite an extent and many will not be useful.
+
+
+```{r}
+# We can perform an exploration of our model 
+# through the use of the summary function as shown
+# ---
+# Upon running the code, the function would give us information about the model 
+# i.e. the size of rules, depending on the items that contain these rules. 
+# In our above case, most rules have 3 and 4 items though some rules do have upto 6. 
+# More statistical information such as support, lift and confidence is also provided.
+# ---
+# 
+summary(rules)
+
+```
+
+
+```{r}
+# Observing rules built in our model i.e. first 5 model rules
+# ---
+# 
+inspect(rules1[1:5])
+
+
+# Interpretation of the first rule:
+# ---
+# If someone buys frozen smoothie and spinach, they are 88% likely to buy mineral water  too
+# ---
+```
+We Interpretate the first rule: as If someone buys mushroom cream sauce and pasta, they are 95% likely to buy escalope
+
+
+
+
+```{r}
+# Observing rules built in our model i.e. first 2 model rules
+# ---
+# 
+
+inspect(rules2[1:2])
+
+```
+
+* Interpretation of the first rule:If someone buys mushroom cream sauce and pasta, they are 95% likely to buy escalope  too
+
+* Interpretation of the second rule:If someone buys frozen vegetables,olive oil and tomatoes, they are 84% likely to buy spaghetti  too
+
+`
+
+
+
+
+
+`
