@@ -1,0 +1,593 @@
+---
+title: "part_1 and 2_carrefour_analysis"
+author: "Esther_Wairimu_Kamau"
+date: "1/21/2021"
+output: html_document
+---
+
+
+#### 1.Problem statement
+
+Esther and co.analytics  have been contracted by Carrefour Kenya and are currently undertaking a project that will inform the marketing department on the most relevant marketing strategies that will result in the highest no. of sales (total price including tax). We will divide the project into four parts where we'll explore a recent marketing dataset by performing various analysis and algorithms and later providing recommendations based on our insights.
+
+#### 2.Metrics of success
+
+Performing indepth analysis and provide insights.Especially on the fast moving the most revenue growers products(product lines in our case).Carrefour deepest concern is simply strategies for shorter the conversion cycle.This invaluable supply chain metric will CARREFOUR Kenya can take the right measures to ensure that they run business with less money tied up in operations.
+
+
+#### 3.Business Understanding
+
+On 17 May 2016, the Majid Al Futtaim Group - the official franchise partner opened its first Carrefour hypermarket in Kenya, in Nairobi county.The country's .in 2019 it operated two hypermarket locations, one at the Hub and the other at Two Rivers.The European based supermarket Carrefour, which is the first hypermarket in the world has finally opened two branches in Kenya and is set out to open another one at Thika Road Mall.
+
+
+#### 4.Data Understanding
+* **cost of goods sold ( COGS)** efers to the direct costs of producing the goods sold by a company.(unit price*quantity) 
+
+* **Gross margin** is a company's net sales revenue minus its cost of goods sold ( COGS). In other words, it is the sales revenue a company retains .is more correctly defined as a percentage, and is used as a profitability metric(gross income/total * 100)
+
+* **Gross income**The gross income for a company reveals how much money it has made on its products or services after subtracting the direct costs(COGS) to make the product or provide the service.
+
+* **Total**In our dataset we get this by adding COGS and gross income
+
+#### 3.Loading  and Exploring our dataset
+
+* **Tax**In our dataset this is equal to gross income.(Its identical)
+
+* **unit price**this is the price of one commodity purchased.
+
+* **quantity**this are the number of units purchased at a particular day and time.
+
+* **Gender** this is whether the purchaser is male or female
+
+* **productline**the department the commodity being purchased belongs to
+
+* **Branch**the branch the commodity being purchased is in our case there is A,B and C
+
+* **customer**if the person purchasing is a member or normal customer.Member meaning they have registered with the supermarkets loyalty points scheme.
+
+* **invoiceid**is the unique identifier for each purchase and also our primary key
+
+* **payment**this is the means that the customer uses to pay for their purchase example of one method is cash/ewallet/creditcard
+
+
+```{r}
+library("readr")
+
+cr <- read.csv("http://bit.ly/CarreFourDataset")
+
+head(cr,n=3)
+```
+
+
+
+```{r}
+#previewing the bottom of the dataset
+
+tail(cr,n=3)
+```
+
+
+
+```{r}
+#we check the column names we have
+names(cr)
+```
+we observe that we have total of 16 columns heads we can confirm  with dim function below
+
+
+```{r}
+#we can also check the no of rows and columns
+
+dim(cr)
+
+```
+
+
+```{r}
+#we can also go ahead and check for the datatypes
+
+str(cr)
+
+```
+* we observe that,Customer type,payment,branch and gender are categorical we can hot encode them into numerical if needed
+
+* we also have one string column that is the product line
+
+* our primary key id invoice ID Since it has unique values to identify the rows
+
+* Rating column helps us profile our customers
+
+* we also have date and time columns
+
+* the tax and gross income have the same value so we can drop one
+
+* gross margin percentage is the same has one constant number we can also drop the column
+
+
+
+```{r}
+#we can go ahead and check for the number missing values per column
+
+colSums(is.na(cr))
+
+```
+we observe that we have no missing values 
+
+
+```{r}
+#we can go ahead and check for duplicated values
+duplicated_rows <- cr[duplicated(cr),]
+
+dim(duplicated_rows)
+
+```
+we have o rows in the 16 columns that have been duplicated
+
+
+```{r}
+#we can go ahead and check for the outliers
+#first we can go ahead and choose the numerical columns only
+
+nums <- subset(cr, select = c(Unit.price, Quantity, Tax,cogs, gross.margin.percentage,gross.income, Rating ,Total))
+
+colnames(nums)
+
+boxplot(nums)
+
+```
+We observe that column cogs and total have a few outliers
+
+
+
+#### 5.Tidying the Dataset
+
+```{r}
+#we can first start by changing the pesky column names 
+#we will first change them to lowercase then we will rename them
+# First we Change the type of the loaded dataset to a dataframe
+
+cr = as.data.frame(cr)
+
+# Change column names, by making them uniform
+
+colnames(cr) = tolower(colnames(cr))
+
+#to confirm the change
+
+names (cr)
+
+```
+
+
+```{r}
+library(reshape)
+
+```
+
+
+```{r}
+
+cr <- rename(cr, c(invoice.id="invoice"))
+cr <- rename(cr, c(gross.margin.percentage="grossmargin")) 
+cr <- rename(cr, c(product.line="product"))
+cr <- rename(cr, c(customer.type="customer"))
+cr <- rename(cr, c(gross.income="grossincome"))
+cr <- rename(cr, c(unit.price="unitprice"))
+
+names(cr)
+
+```
+
+
+
+```{r}
+#since we have columns that are identical tax and gross income we drop one
+#we also drop the constant column grossmargin
+#we dont need invoiceid in our modelling or analysis
+
+cr[ ,c('tax', 'grossmargin','invoice')] <- list(NULL)
+
+
+```
+
+
+
+
+```{r}
+#to confirm they have been deleted
+
+names(cr)
+
+```
+
+
+
+```{r}
+
+#we can also separate the date column into 'year','month','day'
+
+library(tidyr)
+library(dplyr)
+
+crd <- separate(cr, date, c("month", "day", "year"))
+
+head(crd,n=2) 
+
+```
+
+After splitting the data we observe that our data is for the year 2019
+
+
+
+```{r}
+
+library(tidyverse)
+library(magrittr) 
+
+#Factors are used to represent categorical data. Factors can be ordered or unordered and are an important class for statistical analysis and for plotting.
+#For the categorical data we change to levels
+
+cat2= c('customer', 'payment','branch', 'gender','product','year','month','day')
+
+# Changing columns to factors
+
+crd[,cat2] %<>% lapply(function(x) as.factor(as.character(x)))
+
+str(crd)
+```
+
+we observe that:
+
+* there two types of customers member and normal
+
+* also there 6 types of product line with one being electronic accessories
+
+* also there is male and female gender only
+
+* also there 3 types of payment with one of being credit card
+
+* there is also three branches A,B and C
+
+* We have one year 2019
+
+* we also have 3 months and 31 days
+
+
+
+#### 6.Preparing our dataset for Analysis
+```{r}
+#we start by separating our datatypes columns we divide the into numerical and into categorical
+#this helps alot when it comes to plotting and statistical analysis 
+# we had already defined both but need subsets with the cleaned dataset
+
+numcols <- subset(crd, select = c(unitprice, quantity,cogs,grossincome, rating ,total))
+
+head(numcols,n=3)
+
+```
+
+
+
+```{r}
+catcols <- subset(crd, select = c(branch, customer,gender,product, month,day, year,payment))
+
+head(catcols,n=3)
+```
+
+
+
+```{r}
+#we can go ahead and change the above dataframes into tibbles for easier 
+
+numt<-as_tibble(numcols)
+
+head(numt,n=3)
+
+```
+ 
+ 
+```{r}
+cat3<-as_tibble(catcols)
+
+head(cat3,n=3)
+
+```
+ 
+ 
+ 
+
+#### 7.Exploratory Data Analysis
+
+##### Univariate Analysis
+
+```{r}
+
+library(ggplot2)
+library(psych)
+
+#Descriptive analysis into measures of central Tendency
+#this is usually carried out for the numerical data in the datasets
+#we get the statistics for the numerics and draw conclusions from them
+
+describe(numt)
+
+
+```
+we observe that we 13 numerical columns:
+
+* the mean of cogs and total are high and grossmargin and quantity low
+
+* grossincome is mostly 15units of cost with the highest being 49.6 and the lowest being 0.51.
+
+* quantities of most units is 5 with the highest being 10pcs  and lowest being 1pc
+
+* most units cost around 56 units cost price with the highest being 99 and lowest 10.
+
+* We also observe that the mean of tax columns is the same with that of grosss income
+
+
+
+```{r}
+
+par(mfrow = c(2, 2))
+hist(numt$unitprice)
+hist(numt$quantity)
+hist(numt$cogs) 
+hist(numt$grossincome) 
+hist(numt$rating) 
+hist(numt$total)
+
+```
+
+
+
+```{r}
+par(mfrow = c(2, 2))
+f1 <- cat3$branch 
+f1y<- table(f1) 
+head.matrix(f1y)
+f2 <- cat3$customer 
+f2y<- table(f2) 
+head.matrix(f2y)
+f3 <- cat3$gender 
+f3y<- table(f3)
+head.matrix(f3y)
+f4 <- cat3$product 
+f4y<- table(f4) 
+head.matrix(f4y)
+f5 <- cat3$month 
+f5y<- table(f5)
+head.matrix(f5y)
+f6 <- cat3$day 
+f6y<- table(f6) 
+head.matrix(f6y)
+f7 <- cat3$payment 
+f7y<- table(f7)
+head.matrix(f7y)
+
+```
+
+
+
+```{r}
+par(mfrow = c(2, 2))
+barplot(f1y,col="green")
+barplot(f2y,col="red")
+barplot(f3y,col="blue")
+barplot(f4y,col="black")
+barplot(f5y,col="yellow")
+barplot(f6y,col="dark green")
+barplot(f7y,col="purple")
+
+```
+
+
+
+#### Bivariate Analysis
+
+```{r}
+
+crd %>%
+ggplot() +
+aes(x = quantity, month = ..count../nrow(crd), fill = month) +
+geom_bar() +
+ylab("monthly sale trends")
+
+```
+
+
+
+
+```{r}
+crd %>%
+ggplot() +
+aes(x = day, grossincome = ..count../nrow(crd), fill = grossincome) +
+geom_bar() +
+ylab("daily revenue trends")
+```
+
+
+
+```{r}
+crd %>%
+ggplot() +
+aes(x = quantity, product = ..count../nrow(crd), fill = product) +
+geom_bar() +
+ylab("product sales trends")
+```
+
+
+
+```{r}
+crd %>%
+ggplot() +
+aes(x = quantity, payment = ..count../nrow(crd), fill = payment) +
+geom_bar() +
+ylab("payment sales trends")
+
+```
+
+```{r}
+
+crd %>%
+ggplot() +
+aes(x = quantity, gender = ..count../nrow(crd), fill = gender) +
+geom_bar() +
+ylab("product quantity trends")
+
+```
+
+
+
+
+```{r}
+crd %>%
+ggplot() +
+aes(x = quantity, customer = ..count../nrow(crd), fill = customer) +
+geom_bar() +
+ylab("product sale trends")
+
+```
+
+
+```{r}
+crd %>%
+ggplot() +
+aes(x = quantity, branxh = ..count../nrow(crd), fill = branch) +
+geom_bar() +
+ylab("branch sale trends")
+```
+
+
+```{r}
+#Distribution of income per Gender
+
+ggplot(crd,aes(x = total, fill = gender)) +geom_density(alpha = 0.4) +labs(title = "Distribution of total sales per Gender")
+
+```
+
+```{r}
+#Distribution of income per Gender
+
+ggplot(crd,aes(x = total, fill = branch)) +geom_density(alpha = 0.4) +labs(title = "Distribution of total sales per branch")
+
+```
+
+
+
+```{r}
+#Distribution of income per Gender
+
+ggplot(crd,aes(x = total, fill = customer)) +geom_density(alpha = 0.4) +labs(title = "does membership affect sales")
+
+```
+
+
+####
+
+```{r}
+library(ggcorrplot)
+library(corrplot)
+```
+
+
+
+```{r}
+
+# Plotting the Correlation Heatmap
+crcor<-cor(numt)
+
+library(ggcorrplot)
+ggcorrplot(crcor, hc.order = F,type = 
+"lower", lab = T ,
+  ggtheme = ggplot2::theme_gray,
+  colors = c("#00798c", "white", "#edae49"))
+
+```
+
+The highly correlated features in this dataset were the Cogs , grossincome and total
+
+features with a correlation coefficient of 1(greater than 0.75).We can just drop the 
+
+above highly correlated columns during modelling.This is how feature selection is done 
+
+during multivariate analysis.
+
+
+
+
+
+#### 8.Feature Enginnering
+
+```{r}
+#We had already ran the numericals and dropped redundant columns 
+#we named the numt
+pca <- prcomp(numt[,c(1:6)], center = TRUE, scale = TRUE)
+summary(pca)
+```
+we observe that after carrying the first principal component explained 65.45% of the total variance while the last three components explained 34.45% of the variance
+
+
+
+```{r}
+#used the string function to know which variables were to be consindered
+
+str(pca)
+
+```
+we observe that unit pricr,quantity,cogs and grossincome were thr four variables to be highly consindered during modelling.
+
+
+```{r}
+#plotting the PCA to see the above visually
+#we will use ggbiplot library
+
+library(ggbiplot)
+
+```
+```{r}
+
+ggbiplot(pca, obs.scale = 0.5, var.scale = 0.5, groups = crd$customer,ellipse = TRUE, circle = TRUE)
+
+```
+
+we observe that whether the customer is loyal or new customer the four variables will explain 65.5 plus 16.7 making it 81.2 variance which is fairly high.
+
+
+
+
+#### 9.Wrapper methods
+
+```{r}
+# Sequential forward greedy search (default)
+# ---
+#
+library(clustvarsel)
+
+```
+
+```{r}
+
+library(mclust)
+out = clustvarsel(numt)
+out
+
+```
+we  observe that the columns quantity,cogs and unitprice have been accepted and can be used for modelling.This is a more accurate way of feature selection it can be used to furtherbreakdown from PCA and CORRELATION matrix .It is a form of hyperparametee tuning.
+
+
+
+```{r}
+# The selection algorithm would indicate that the subset 
+# we use for the clustering model is composed of variables X1 and X2 
+# and that other variables should be rejected. 
+# Having identified the variables that we use, we proceed to build the clustering model:
+# 
+Subset1 = numt[,out$subset]
+
+crc = Mclust(Subset1)
+
+summary(crc)
+
+```
+
